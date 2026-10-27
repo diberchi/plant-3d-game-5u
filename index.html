@@ -1,0 +1,2274 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>五上自然科學：千變萬化的植物 - 3D 沉浸式教學遊戲</title>
+  <!-- Three.js CDN -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+  <style>
+    :root {
+      --primary: #2e7d32;
+      --primary-light: #4caf50;
+      --primary-dark: #1b5e20;
+      --accent: #ffb300;
+      --accent-hover: #ffa000;
+      --bg-dark: rgba(15, 23, 42, 0.88);
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --danger: #ef4444;
+      --success: #22c55e;
+      --card-bg: rgba(255, 255, 255, 0.96);
+      --card-text: #1e293b;
+      --font-family: "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0f172a;
+      font-family: var(--font-family);
+      color: var(--text);
+    }
+
+    #webgl-canvas {
+      width: 100vw;
+      height: 100vh;
+      display: block;
+      touch-action: none;
+    }
+
+    /* Loading Screen */
+    #loading-screen {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      background: radial-gradient(circle at center, #1e3a1e 0%, #0a130a 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      transition: opacity 0.6s ease, visibility 0.6s ease;
+    }
+
+    #loading-screen.done {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .loader-title {
+      font-size: 2.2rem;
+      font-weight: 800;
+      color: #81c784;
+      margin-bottom: 8px;
+      text-align: center;
+      text-shadow: 0 4px 12px rgba(0,0,0,0.6);
+      letter-spacing: 1px;
+    }
+
+    .loader-subtitle {
+      font-size: 1.1rem;
+      color: #c8e6c9;
+      margin-bottom: 32px;
+      text-align: center;
+    }
+
+    .loader-progress-box {
+      width: min(420px, 85vw);
+      height: 14px;
+      background: rgba(255,255,255,0.15);
+      border-radius: 999px;
+      overflow: hidden;
+      margin-bottom: 16px;
+      border: 1px solid rgba(255,255,255,0.25);
+    }
+
+    .loader-progress-bar {
+      width: 0%;
+      height: 100%;
+      background: linear-gradient(90deg, #4caf50, #ffb300);
+      border-radius: 999px;
+      transition: width 0.3s ease;
+    }
+
+    .loader-status {
+      font-size: 0.95rem;
+      color: #a5d6a7;
+      margin-bottom: 24px;
+    }
+
+    .start-btn {
+      padding: 14px 44px;
+      font-size: 1.25rem;
+      font-weight: bold;
+      color: #0f2d12;
+      background: linear-gradient(135deg, #a5d6a7, #ffb300);
+      border: none;
+      border-radius: 30px;
+      cursor: pointer;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+      transform: translateY(0);
+      transition: transform 0.2s, box-shadow 0.2s;
+      display: none;
+    }
+
+    .start-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(255, 179, 0, 0.4);
+    }
+
+    /* HUD */
+    #hud {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 16px;
+    }
+
+    .hud-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .hud-card {
+      background: var(--bg-dark);
+      border: 1px solid rgba(255,255,255,0.15);
+      backdrop-filter: blur(8px);
+      border-radius: 14px;
+      padding: 10px 16px;
+      pointer-events: auto;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    }
+
+    .quest-title {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    .quest-desc {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: #ffffff;
+      margin-top: 2px;
+    }
+
+    .status-group {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .hp-box {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .hp-bar-outer {
+      width: 100px;
+      height: 12px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .hp-bar-inner {
+      width: 100%;
+      height: 100%;
+      background: #22c55e;
+      transition: width 0.3s, background-color 0.3s;
+    }
+
+    .seeds-box {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: bold;
+      color: #ffca28;
+    }
+
+    .top-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .icon-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      background: var(--bg-dark);
+      border: 1px solid rgba(255,255,255,0.15);
+      color: #fff;
+      font-size: 1.1rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      pointer-events: auto;
+      transition: background 0.2s;
+    }
+
+    .icon-btn:hover {
+      background: rgba(255,255,255,0.2);
+    }
+
+    /* Prompt Button in world */
+    #interact-prompt {
+      position: fixed;
+      bottom: 90px;
+      left: 50%;
+      transform: translateX(-50%) scale(0.9);
+      background: linear-gradient(135deg, #2e7d32, #43a047);
+      border: 2px solid #81c784;
+      color: #fff;
+      padding: 12px 28px;
+      border-radius: 30px;
+      font-size: 1.1rem;
+      font-weight: bold;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      cursor: pointer;
+      pointer-events: auto;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      z-index: 150;
+      animation: pulseBtn 1.8s infinite;
+    }
+
+    #interact-prompt.show {
+      opacity: 1;
+      visibility: visible;
+      transform: translateX(-50%) scale(1);
+    }
+
+    @keyframes pulseBtn {
+      0%, 100% { transform: translateX(-50%) scale(1); }
+      50% { transform: translateX(-50%) scale(1.06); }
+    }
+
+    /* Virtual Joystick */
+    #joystick-zone {
+      position: fixed;
+      bottom: 24px;
+      left: 24px;
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.12);
+      border: 2px solid rgba(255,255,255,0.25);
+      pointer-events: auto;
+      z-index: 120;
+      display: none;
+      touch-action: none;
+    }
+
+    #joystick-thumb {
+      position: absolute;
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.8);
+      top: 36px;
+      left: 36px;
+      pointer-events: none;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    }
+
+    /* Modal Framework */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(10px);
+      z-index: 500;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s ease, visibility 0.3s ease;
+    }
+
+    .modal-overlay.active {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .modal-card {
+      background: var(--card-bg);
+      color: var(--card-text);
+      width: min(720px, 94vw);
+      max-height: 88vh;
+      border-radius: 20px;
+      overflow-y: auto;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+      padding: 24px;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      animation: modalSlideUp 0.3s ease;
+    }
+
+    @keyframes modalSlideUp {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    .modal-header {
+      border-bottom: 2px solid #e2e8f0;
+      padding-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-title {
+      font-size: 1.45rem;
+      font-weight: 800;
+      color: var(--primary-dark);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .lesson-badge {
+      background: #e8f5e9;
+      color: #2e7d32;
+      font-size: 0.85rem;
+      padding: 4px 10px;
+      border-radius: 8px;
+      font-weight: bold;
+    }
+
+    .lesson-text {
+      line-height: 1.75;
+      font-size: 1.08rem;
+      color: #334155;
+      background: #f8fafc;
+      padding: 16px;
+      border-radius: 12px;
+      border-left: 4px solid var(--primary);
+    }
+
+    .lesson-text em {
+      font-style: normal;
+      font-weight: bold;
+      color: #1b5e20;
+      background: #c8e6c9;
+      padding: 2px 4px;
+      border-radius: 4px;
+    }
+
+    /* Question Elements */
+    .q-step-box {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .q-badge {
+      display: inline-block;
+      font-size: 0.8rem;
+      font-weight: bold;
+      padding: 2px 8px;
+      border-radius: 6px;
+      background: #dbeafe;
+      color: #1e40af;
+      width: fit-content;
+    }
+
+    .q-stem {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #0f172a;
+      line-height: 1.5;
+    }
+
+    .options-grid {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: 1fr;
+    }
+
+    .option-btn {
+      background: #ffffff;
+      border: 2px solid #cbd5e1;
+      padding: 14px 16px;
+      border-radius: 12px;
+      font-size: 1.05rem;
+      font-weight: 600;
+      text-align: left;
+      cursor: pointer;
+      color: #1e293b;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      transition: all 0.2s;
+    }
+
+    .option-btn:hover {
+      border-color: var(--primary);
+      background: #f1f8e9;
+    }
+
+    .option-btn.selected {
+      border-color: #2e7d32;
+      background: #e8f5e9;
+    }
+
+    .option-btn.correct {
+      background: #dcfce7 !important;
+      border-color: #22c55e !important;
+      color: #15803d !important;
+    }
+
+    .option-btn.wrong {
+      background: #fee2e2 !important;
+      border-color: #ef4444 !important;
+      color: #b91c1c !important;
+    }
+
+    .feedback-box {
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      line-height: 1.5;
+      display: none;
+    }
+
+    .feedback-box.show {
+      display: block;
+    }
+
+    .feedback-box.error {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #991b1b;
+    }
+
+    .feedback-box.success {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      color: #166534;
+    }
+
+    .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-top: 8px;
+    }
+
+    .btn-action {
+      padding: 12px 28px;
+      font-size: 1.05rem;
+      font-weight: bold;
+      border-radius: 12px;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: #fff;
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-dark);
+    }
+
+    .btn-secondary {
+      background: #e2e8f0;
+      color: #334155;
+    }
+
+    /* Matching items */
+    .match-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .match-col {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .match-item {
+      padding: 10px 14px;
+      background: #fff;
+      border: 2px dashed #94a3b8;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      text-align: center;
+      transition: background 0.2s;
+    }
+
+    .match-item.active {
+      background: #e2e8f0;
+      border-color: #3b82f6;
+    }
+
+    .match-item.paired {
+      background: #dcfce7;
+      border-color: #22c55e;
+      border-style: solid;
+      color: #15803d;
+      font-weight: bold;
+    }
+
+    /* Ordering items */
+    .order-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .order-item {
+      padding: 12px 16px;
+      background: #fff;
+      border: 2px solid #cbd5e1;
+      border-radius: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: 600;
+    }
+
+    .order-btns {
+      display: flex;
+      gap: 4px;
+    }
+
+    .order-btn-move {
+      padding: 4px 10px;
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    /* Certificate Canvas Preview */
+    #cert-preview {
+      width: 100%;
+      max-width: 580px;
+      border-radius: 12px;
+      box-shadow: 0 6px 25px rgba(0,0,0,0.2);
+      margin: 0 auto;
+      display: block;
+    }
+
+    /* Toast Notification */
+    #toast {
+      position: fixed;
+      top: 80px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-20px);
+      background: rgba(15, 23, 42, 0.92);
+      color: #fff;
+      padding: 10px 22px;
+      border-radius: 20px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      border: 1px solid rgba(255,255,255,0.2);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+      z-index: 600;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.3s;
+      pointer-events: none;
+    }
+
+    #toast.show {
+      opacity: 1;
+      visibility: visible;
+      transform: translateX(-50%) translateY(0);
+    }
+  </style>
+</head>
+<body>
+  <!-- 3D Canvas -->
+  <canvas id="webgl-canvas"></canvas>
+
+  <!-- Loading Screen -->
+  <div id="loading-screen">
+    <div class="loader-title">🌿 千變萬化的植物世界 🌿</div>
+    <div class="loader-subtitle">國小五年級上學期自然科學第二單元 3D 沉浸式探究</div>
+    <div class="loader-progress-box">
+      <div class="loader-progress-bar" id="load-bar"></div>
+    </div>
+    <div class="loader-status" id="load-status">正在生成 3D 植物溫室生態圈...</div>
+    <button class="start-btn" id="start-btn">🌱 踏入植物王國探險</button>
+  </div>
+
+  <!-- In-game HUD -->
+  <div id="hud">
+    <div class="hud-top">
+      <div class="hud-card">
+        <div class="quest-title" id="hud-act">第一幕：植物身體的秘密</div>
+        <div class="quest-desc" id="hud-quest">關卡 1：尋找大樹下的根系構造</div>
+      </div>
+      <div class="status-group">
+        <div class="hud-card hp-box">
+          <span>❤️ 體力</span>
+          <div class="hp-bar-outer">
+            <div class="hp-bar-inner" id="hud-hp-bar"></div>
+          </div>
+          <span id="hud-hp-text">100</span>
+        </div>
+        <div class="hud-card seeds-box">
+          <span>🌱 徽章:</span>
+          <span id="hud-seeds">0</span>
+        </div>
+        <div class="top-actions">
+          <button class="icon-btn" id="btn-stages" title="關卡一覽">📖</button>
+          <button class="icon-btn" id="btn-sound" title="切換音效">🔊</button>
+          <button class="icon-btn" id="btn-teacher" title="教師通道">🎓</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Interact Prompt in World -->
+  <button id="interact-prompt">🔍 接受任務與挑戰 (空白鍵)</button>
+
+  <!-- Virtual Joystick (Mobile) -->
+  <div id="joystick-zone">
+    <div id="joystick-thumb"></div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast">提示訊息</div>
+
+  <!-- Story & Question Dialog Modal -->
+  <div class="modal-overlay" id="dialog-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span id="dlg-icon">🌱</span>
+          <span id="dlg-title">關卡探索</span>
+        </div>
+        <span class="lesson-badge" id="dlg-badge">課本 P.42-45</span>
+      </div>
+
+      <!-- Lesson Readout View -->
+      <div id="view-lesson">
+        <div class="lesson-text" id="dlg-text">
+          課文內容...
+        </div>
+        <div class="modal-footer">
+          <button class="btn-action btn-primary" id="btn-start-challenge">⚔️ 開始挑戰題目</button>
+        </div>
+      </div>
+
+      <!-- Step Question View -->
+      <div id="view-question" style="display:none;">
+        <div class="q-step-box">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span class="q-badge" id="q-level">PIRLS 擷取訊息</span>
+            <span style="font-size:0.9rem; color:#64748b;" id="q-step-index">第 1 / 3 題</span>
+          </div>
+          <div class="q-stem" id="q-stem">題目題幹</div>
+
+          <div id="q-body">
+            <!-- Dynamically populated by question type -->
+          </div>
+
+          <div class="feedback-box" id="q-feedback"></div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn-action btn-secondary" id="btn-retry-step" style="display:none;">🔄 重新思考</button>
+          <button class="btn-action btn-primary" id="btn-submit-step">送出答案</button>
+          <button class="btn-action btn-primary" id="btn-next-step" style="display:none;">下一題 ➔</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stage List Modal -->
+  <div class="modal-overlay" id="stages-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">🗺️ 關卡地圖導覽</div>
+        <button class="icon-btn" id="btn-close-stages" style="color:#000;">✕</button>
+      </div>
+      <div id="stages-list-container" style="display:flex; flex-direction:column; gap:8px;"></div>
+    </div>
+  </div>
+
+  <!-- Certificate Ceremony Modal -->
+  <div class="modal-overlay" id="cert-modal">
+    <div class="modal-card" style="text-align:center;">
+      <div class="modal-header">
+        <div class="modal-title" style="margin:0 auto; color:#2e7d32;">🏆 恭喜成為五上自然「特優植物學家」！</div>
+      </div>
+      <p style="font-size:1.05rem; color:#475569;">您已成功完成第二單元「千變萬化的植物」全數關卡！請領取您的個人專屬榮譽證書：</p>
+      
+      <div style="display:flex; justify-content:center; gap:12px; margin:10px 0;">
+        <input type="text" id="cert-school" placeholder="學校與班級 (例: 新進國小五年一班)" style="padding:10px 14px; border:2px solid #cbd5e1; border-radius:10px; width:240px; font-size:1rem;">
+        <input type="text" id="cert-name" placeholder="學生姓名" style="padding:10px 14px; border:2px solid #cbd5e1; border-radius:10px; width:160px; font-size:1rem;">
+        <button class="btn-action btn-primary" id="btn-gen-cert">更新證書</button>
+      </div>
+
+      <canvas id="cert-canvas" width="1200" height="850" style="display:none;"></canvas>
+      <img id="cert-preview" alt="榮譽證書預覽">
+
+      <div class="modal-footer" style="justify-content:center;">
+        <button class="btn-action btn-primary" id="btn-download-cert">📥 下載榮譽證書 (PNG)</button>
+        <button class="btn-action btn-secondary" id="btn-restart-game">🔄 重新挑戰</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Game Logic Script (Module) -->
+  <script type="module">
+    import * as THREE from 'three';
+
+    /* --- 1. Sound Synthesis via WebAudio --- */
+    class SoundEngine {
+      constructor() {
+        this.ctx = null;
+        this.enabled = true;
+      }
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          this.ctx = new AudioContext();
+        }
+        if (this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+      playCorrect() {
+        if (!this.enabled || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(523.25, now); // C5
+        osc.frequency.setValueAtTime(659.25, now + 0.1); // E5
+        osc.frequency.setValueAtTime(783.99, now + 0.2); // G5
+        osc.frequency.setValueAtTime(1046.50, now + 0.3); // C6
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.6);
+      }
+      playWrong() {
+        if (!this.enabled || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(220, now);
+        osc.frequency.linearRampToValueAtTime(110, now + 0.3);
+        gain.gain.setValueAtTime(0.25, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.3);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.3);
+      }
+      playBadge() {
+        if (!this.enabled || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        [523.25, 659.25, 783.99, 1046.5, 1318.5].forEach((freq, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.value = freq;
+          gain.gain.setValueAtTime(0.2, now + idx * 0.08);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.5);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now + idx * 0.08);
+          osc.stop(now + idx * 0.08 + 0.5);
+        });
+      }
+      playChime() {
+        if (!this.enabled || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, now);
+        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.4);
+      }
+    }
+    const SND = new SoundEngine();
+
+    /* --- 2. Stages and Pedagogical Data --- */
+    const STAGES = [
+      {
+        id: 0,
+        act: 1,
+        actName: "第一幕：植物身體的秘密（根、莖、葉）",
+        name: "深藏不露的根部密碼",
+        icon: "🌳",
+        badge: "課本 P.42~45 根的型態與功能",
+        pos: new THREE.Vector3(0, 0, -20),
+        quest: "前往大榕樹下，觀察植物多樣的根部型態！",
+        text: `植物的根除了常見的<em>軸根</em>（如菠菜、咸豐草）與<em>鬚根</em>（如蔥、玉米）外，有些植物因應環境演化出獨特的根！<br><br>
+               例如：<strong>榕樹的「氣生根」</strong>垂掛在空氣中吸收水氣；<strong>木麻黃的「板根」</strong>能抓緊沙土抵抗強風；<strong>甘藷的「塊根」</strong>則能膨大儲存大量養分，甚至能用來繁殖下一代！`,
+        steps: [
+          {
+            type: "tf",
+            level: "直接推論",
+            q: "榕樹垂掛在空氣中的「氣生根」，主要功能是吸收空氣中的水分與濕氣。",
+            answer: true,
+            hint: "榕樹枝幹下垂的長鬚是氣生根，接觸土壤後還能長成支持根喔！"
+          },
+          {
+            type: "choice",
+            level: "擷取訊息",
+            q: "下列關於植物「根」的敘述，哪一個錯誤？",
+            options: [
+              "可以吸收土壤中的水分和礦物質養分",
+              "有些植物的根可以儲藏養分（如甘藷）",
+              "可以抓住泥土固定植物身體",
+              "所有的植物根都一定完全生長在泥土中"
+            ],
+            answer: 3,
+            hint: "想一想榕樹垂在空中的根，或是水生植物漂浮在水中的根。"
+          },
+          {
+            type: "match",
+            level: "詮釋整合",
+            q: "請將下列植物的根與其獨特構造/功能正確配對：",
+            pairs: [
+              { item: "榕樹氣生根", target: "吸收空氣中水分" },
+              { item: "木麻黃板根", target: "抵抗強風抓緊土壤" },
+              { item: "甘藷塊根", target: "儲存豐富養分" }
+            ],
+            hint: "板根像屏風般向外延伸，塊根圓滾滾儲存澱粉。"
+          }
+        ]
+      },
+      {
+        id: 1,
+        act: 1,
+        actName: "第一幕：植物身體的秘密（根、莖、葉）",
+        name: "挺拔的莖與水分高速公路",
+        icon: "🎋",
+        badge: "課本 P.46~49 莖的分類與水分輸送",
+        pos: new THREE.Vector3(-30, 0, -35),
+        quest: "前往透明實驗台，觀察紅墨水在植物體內的輸送路徑！",
+        text: `植物的莖可分為粗壯木質化的<em>木本莖</em>（如樟樹、鳳凰木）與柔軟多汁的<em>草本莖</em>（如芹菜、咸豐草）。<br><br>
+               當我們把芹菜插進<em>紅色水溶液</em>中，紅水會經由根毛吸收，順著莖裡面的<strong>維管束管道</strong>向上輸送至葉片，提供全株水分！`,
+        steps: [
+          {
+            type: "choice",
+            level: "擷取訊息",
+            q: "進行「植物體內水分輸送」實驗時，把植物根浸泡在紅色水溶液中，一段時間後會發現？",
+            options: [
+              "只有最底部的根部變紅",
+              "只有頂端的葉子變紅",
+              "根、莖、葉的內部維管束都會出現紅色痕跡",
+              "植物無法吸水並立刻枯黃"
+            ],
+            answer: 2,
+            hint: "水分是由下而上透過導管送到植物全身每個部位的。"
+          },
+          {
+            type: "order",
+            level: "統整解釋",
+            q: "請依序排列植物體內水分吸收與輸送的正確路徑：",
+            items: [
+              "根毛吸收土壤中的水分",
+              "莖內部維管束向上輸送",
+              "送達葉片進行光合作用與蒸散"
+            ],
+            hint: "水分由地底根部啟程，穿過莖部主幹，最後抵達綠葉。"
+          },
+          {
+            type: "tf",
+            level: "直接推論",
+            q: "鳳凰木具有粗壯的木本莖，可以強健有力地支撐整株高大茂密的樹冠。",
+            answer: true,
+            hint: "木本植物富含木質部，質地堅硬堅固。"
+          }
+        ]
+      },
+      {
+        id: 2,
+        act: 1,
+        actName: "第一幕：植物身體的秘密（根、莖、葉）",
+        name: "神奇的綠色工廠——葉片探秘",
+        icon: "🍃",
+        badge: "課本 P.50~53 葉脈與蒸散作用",
+        pos: new THREE.Vector3(-45, 0, 0),
+        quest: "前往溫室葉片觀測站，檢驗葉面蒸散作用的秘密！",
+        text: `植物葉片主要有兩種葉脈：<em>網狀脈</em>（如榕樹）與<em>平行脈</em>（如竹子、玉米）。<br><br>
+               葉片表面有許多微小氣孔。將枝葉套上<strong>夾鏈袋</strong>放在陽光下，不久會發現袋壁凝結出清澈的小水滴，這正是植物體內水分藉由氣孔散失到空氣中的<strong>「蒸散作用」</strong>！蒸散作用能產生向上的拉力，幫助根部繼續吸水！`,
+        steps: [
+          {
+            type: "choice",
+            level: "詮釋整合",
+            q: "將植物枝葉套上夾鏈袋放在陽光下一段時間，夾鏈袋內出現的小水滴是怎麼來的？",
+            options: [
+              "空氣中的霧氣吹進袋內",
+              "植物葉片氣孔蒸散出來的水分遇冷凝結",
+              "夾鏈袋塑膠融化析出的水分",
+              "植物受傷分泌出的濃稠乳汁"
+            ],
+            answer: 1,
+            hint: "葉片上的氣孔隨時在進行蒸散作用調節體溫並拉動水分。"
+          },
+          {
+            type: "tf",
+            level: "擷取訊息",
+            q: "植物體內的水分由葉片氣孔散失到空氣中的現象，稱為「蒸散作用」。",
+            answer: true,
+            hint: "這是植物水分循環至關重要的一環。"
+          },
+          {
+            type: "multi",
+            level: "統整解釋",
+            q: "請選出植物「葉片」所具有的重要功能？（請選出所有正確項目）",
+            options: [
+              "利用葉綠素進行光合作用製造養分",
+              "透過氣孔進行水分蒸散調節植物體溫",
+              "透過氣孔進行呼吸作用氣體交換",
+              "在強風中像翅膀一樣帶植物飛到空中"
+            ],
+            answer: [0, 1, 2],
+            hint: "製造養分、蒸散調節、氣體交換都是葉片的核心工作。"
+          }
+        ]
+      },
+      {
+        id: 3,
+        act: 2,
+        actName: "第二幕：花、果實與授粉的奇蹟",
+        name: "花朵的微觀世界",
+        icon: "🌸",
+        badge: "課本 P.54~55 花的構造與授粉",
+        pos: new THREE.Vector3(-30, 0, 35),
+        quest: "走進微觀花朵模型，辨識花萼、花瓣、雄蕊與雌蕊！",
+        text: `一朵典型的花由外向內包含：<em>花萼</em>（保護花苞）、<em>花瓣</em>（吸引昆蟲）、<em>雄蕊</em>與<em>雌蕊</em>。<br><br>
+               <strong>雄蕊</strong>頂端有花藥，負責產生花粉；<strong>雌蕊</strong>則由柱頭、花柱、子房組成，子房內藏有重要的<strong>胚珠</strong>！昆蟲或風將花粉送到黏黏的柱頭上，就是完成「授粉」！`,
+        steps: [
+          {
+            type: "choice",
+            level: "擷取訊息",
+            q: "雄蕊頂端的花藥，主要負責製造什麼重要物質來繁衍下一代？",
+            options: [
+              "甜美的花蜜",
+              "細小的花粉",
+              "堅硬的果皮",
+              "透明的水滴"
+            ],
+            answer: 1,
+            hint: "花藥成熟時會裂開，散出黃色或白色的粉末狀物質。"
+          },
+          {
+            type: "match",
+            level: "詮釋整合",
+            q: "請將雌蕊的構造與其關鍵功能正確配對：",
+            pairs: [
+              { item: "柱頭", target: "分泌黏液接收花粉" },
+              { item: "子房", target: "受精後發育成果實" },
+              { item: "胚珠", target: "受精後發育成為種子" }
+            ],
+            hint: "子房膨大成果實，藏在子房裡的胚珠變成果實裡的種子。"
+          },
+          {
+            type: "tf",
+            level: "直接推論",
+            q: "許多花朵具有鮮艷繽紛的色彩或散發濃郁芳香，主要目的是吸引蜂蝶等動物協助授粉。",
+            answer: true,
+            hint: "動物傳媒花需要視覺與嗅覺信號吸引昆蟲前來採蜜。"
+          }
+        ]
+      },
+      {
+        id: 4,
+        act: 2,
+        actName: "第二幕：花、果實與授粉的奇蹟",
+        name: "生命轉化的奇蹟（授粉到結果）",
+        icon: "🍊",
+        badge: "課本 P.56~57 果實與種子的形成",
+        pos: new THREE.Vector3(0, 0, 45),
+        quest: "觀察果實熟成台，見證子房發育成果實的奇蹟！",
+        text: `當花粉落在柱頭上並完成受精後，花瓣與雄蕊會逐漸枯萎脫落，而位於中心的<strong>子房開始膨大變成果實</strong>，裡面的<strong>胚珠則發育為種子</strong>！<br><br>
+               果實的主要使命就是<em>保護種子</em>，並在成熟時透過各種方式吸引外力幫助種子散播到遠方！`,
+        steps: [
+          {
+            type: "choice",
+            level: "擷取訊息",
+            q: "花朵完成受精後，哪一個部位會逐漸膨大發育成為美味多汁的「果實」？",
+            options: [
+              "花瓣",
+              "花萼",
+              "子房",
+              "雄蕊花絲"
+            ],
+            answer: 2,
+            hint: "子房是果實的前身，保護著內部的種子。"
+          },
+          {
+            type: "order",
+            level: "統整解釋",
+            q: "請排列植物從開花到培育新生命的時間順序：",
+            items: [
+              "花朵綻放引來蜜蜂昆蟲傳粉",
+              "完成受精後子房膨大成果實",
+              "果實成熟保護種子散播出去"
+            ],
+            hint: "開花 ➔ 授粉受精 ➔ 結出果實種子。"
+          },
+          {
+            type: "tf",
+            level: "評鑑",
+            q: "植物果實最核心的生物學功能，就是保護內部的種子並協助其傳播繁衍。",
+            answer: true,
+            hint: "植物結出果實不是專門給人類吃的，是為了繁衍後代！"
+          }
+        ]
+      },
+      {
+        id: 5,
+        act: 3,
+        actName: "第三幕：種子大冒險（四大傳播方式）",
+        name: "乘風飛翔的精靈（風力傳播）",
+        icon: "🌬️",
+        badge: "課本 P.58~59 風力傳播",
+        pos: new THREE.Vector3(35, 0, 30),
+        quest: "前往微風懸崖，觀察隨風翱翔的種子家族！",
+        text: `靠風力傳播的種子或果實通常<em>輕巧</em>，並具有特殊的空氣動力學構造！<br><br>
+               例如：<strong>蒲公英</strong>具有降落傘般的白色冠毛；<strong>木棉</strong>果實裂開後露出帶著棉毛的種子；<strong>青楓（槭樹）</strong>的果實長著兩片薄薄的翅膀，落下時會像直升機螺旋槳般旋轉飄移！`,
+        steps: [
+          {
+            type: "choice",
+            level: "擷取訊息",
+            q: "青楓（槭樹）的果實長有薄薄的翅膀狀構造，主要是利用什麼力量傳播？",
+            options: [
+              "水流沖刷漂流",
+              "動物毛皮勾附",
+              "風力吹送旋轉飄落",
+              "果實像炸彈自身彈射"
+            ],
+            answer: 2,
+            hint: "青楓翅果從高處飄落時，會借助風力像螺旋槳般旋轉滑翔。"
+          },
+          {
+            type: "multi",
+            level: "統整解釋",
+            q: "下列哪些植物的種子主要是依靠「風力」吹拂進行傳播？（請全選）",
+            options: [
+              "長有白色冠毛的蒲公英",
+              "裹在綿密白色棉毛裡的木棉",
+              "長有雙翅造型的青楓翅果",
+              "重達數公斤外殼堅硬的椰子",
+              "帶有倒鉤刺的大花咸豐草"
+            ],
+            answer: [0, 1, 2],
+            hint: "冠毛、棉毛、薄翅都是風力傳播的經典適應構造。"
+          }
+        ]
+      },
+      {
+        id: 6,
+        act: 3,
+        actName: "第三幕：種子大冒險（四大傳播方式）",
+        name: "動物是我的特快車（動物傳播）",
+        icon: "🐾",
+        badge: "課本 P.60~61 動物勾附與食用傳播",
+        pos: new THREE.Vector3(45, 0, 0),
+        quest: "穿越灌木林，觀察種子如何搭上動物便車！",
+        text: `動物傳播主要有兩大絕招：<br>
+               1. <strong>倒鉤勾附</strong>：如<em>大花咸豐草</em>、鬼針草的果實頂端有逆刺倒鉤，走過草地就會勾在動物毛皮或人褲管上。<br>
+               2. <strong>美味誘食</strong>：如<em>榕樹</em>、番茄結出香甜果肉吸引鳥類吃下，種子因具堅硬外皮不被消化，隨糞便排泄到各處！`,
+        steps: [
+          {
+            type: "choice",
+            level: "擷取訊息",
+            q: "在戶外草地散步時，褲管常沾滿黑色的大花咸豐草果實，這是因為它的種子有什麼？",
+            options: [
+              "黏答答的花蜜汁液",
+              "尖銳微小的逆刺倒鉤",
+              "像吸盤一樣的觸手",
+              "自動黏住布料的磁鐵"
+            ],
+            answer: 1,
+            hint: "倒鉤刺讓它能牢固掛在動物毛皮與衣物纖維上。"
+          },
+          {
+            type: "tf",
+            level: "直接推論",
+            q: "小鳥吃下榕樹多汁的果實後，種子因無法被腸胃消化而隨糞便排到遠處，這也是動物傳播的一種。",
+            answer: true,
+            hint: "動物食用後排泄是許多漿果、核果傳播後代的重要方法。"
+          }
+        ]
+      },
+      {
+        id: 7,
+        act: 3,
+        actName: "第三幕：種子大冒險（四大傳播方式）",
+        name: "自身彈射與乘風破浪（彈力與水力傳播）",
+        icon: "🌊",
+        badge: "課本 P.62~63 彈力與水力傳播",
+        pos: new THREE.Vector3(30, 0, -35),
+        quest: "走到生態水池畔，觀察鳳仙花彈射與椰子水上漂！",
+        text: `有些植物不假外求，果實成熟時果皮乾燥產生緊繃張力，輕碰就會<strong>瞬間迸裂捲曲</strong>，將種子高速彈射出去，稱為<em>自身彈力傳播</em>（如<strong>鳳仙花</strong>、<strong>黃花酢漿草</strong>）！<br><br>
+               而生長在水邊的植物如<strong>椰子</strong>，果皮富含纖維與氣室，質輕能漂浮於海面數月，藉由海流漂移到新島嶼繁殖！`,
+        steps: [
+          {
+            type: "choice",
+            level: "擷取訊息",
+            q: "非洲鳳仙花和黃花酢漿草的果實成熟時，果莢會突然扭曲裂開把種子彈出，這種方式稱為？",
+            options: [
+              "風力傳播",
+              "水力傳播",
+              "自身彈力傳播",
+              "小動物啃食傳播"
+            ],
+            answer: 2,
+            hint: "依靠果莢本身的張力與彈性把種子彈飛。"
+          },
+          {
+            type: "match",
+            level: "統整解釋",
+            q: "【四大種子傳播方式總複習】請將植物與其傳播途徑精準配對：",
+            pairs: [
+              { item: "木棉 (種子帶棉毛)", target: "風力傳播" },
+              { item: "大花咸豐草 (具倒鉤)", target: "動物勾附傳播" },
+              { item: "鳳仙花 (果莢迸裂)", target: "自身彈力傳播" },
+              { item: "椰子 (外殼富含纖維氣室)", target: "水力漂流傳播" }
+            ],
+            hint: "回憶一下風、動物、彈力、水力四大機制的經典代表植物！"
+          }
+        ]
+      },
+      {
+        id: 8,
+        act: 4,
+        actName: "第四幕：環境適應與植物分類二分法",
+        name: "適者生存的綠色智慧",
+        icon: "🌵",
+        badge: "課本 P.64~65 極端環境植物構造",
+        pos: new THREE.Vector3(0, 0, -50),
+        quest: "前往溫室耐旱耐候區，探訪仙人掌與高山玉山圓柏！",
+        text: `生活在不同嚴苛環境的植物，會演化出令人驚嘆的生存智慧！<br><br>
+               <strong>仙人掌</strong>生活在乾旱沙漠，葉片退化成<em>針狀刺</em>以減少水分蒸發，綠色膨大的<em>肉質莖</em>用來儲存大量珍貴水分；高山上的<strong>玉山圓柏</strong>長年面對強風吹襲與酷寒，枝幹生長成<em>低矮匍匐彎曲</em>的避風姿態！`,
+        steps: [
+          {
+            type: "choice",
+            level: "詮釋整合",
+            q: "登上高海拔岩壁觀察玉山圓柏，發現它的枝幹低矮匍匐、曲折貼地生長，主要原因是什麼？",
+            options: [
+              "高山土壤太過肥沃導致站不起來",
+              "為了抵抗長年高山強風吹襲而形成的防風形態",
+              "被大型草食動物長期踩踏壓扁",
+              "缺少陽光照射只能貼地生存"
+            ],
+            answer: 1,
+            hint: "高山稜線上長年風勢極大，低矮貼地能減少風阻保護身體。"
+          },
+          {
+            type: "choice",
+            level: "直接推論",
+            q: "仙人掌的葉子退化成尖銳細小的刺，對它的沙漠生存有什麼關鍵好處？",
+            options: [
+              "吸引更多昆蟲來玩耍",
+              "大幅減少葉片表面積，防止體內水分過度蒸散",
+              "吸收地底深處的水分",
+              "加快光合作用進行"
+            ],
+            answer: 1,
+            hint: "表面積越小，水分蒸發越少；刺同時還能防止動物啃食！"
+          }
+        ]
+      },
+      {
+        id: 9,
+        act: 4,
+        actName: "第四幕：環境適應與植物分類二分法",
+        name: "植物特徵二分法大挑戰",
+        icon: "📋",
+        badge: "課本 P.66~67 植物特徵檢索二分法",
+        pos: new THREE.Vector3(-20, 0, -15),
+        quest: "登上植物分類講台，學習科學家的二分法分類！",
+        text: `「二分法」是生物學家常用的分類方法。每次挑選一個<em>明確客觀的特徵</em>，將群體區分為「是」與「否」兩組！<br><br>
+               例如「莖是木本還是草本？」、「生活在水中還是陸地？」、「是否會開花？」。<strong>注意：</strong>分類後的兩群數量不一定要一樣多，而且不能使用「葉子總片數」這種會隨時改變的標準喔！`,
+        steps: [
+          {
+            type: "choice",
+            level: "評鑑",
+            q: "在為一群植物進行二分法分類時，下列哪一個條件「最不適合」當作分類依據？",
+            options: [
+              "植物是否會開花",
+              "植物的莖是木本還是草本",
+              "植物生活在水生還是陸生環境",
+              "植物身上生長的葉子總數量"
+            ],
+            answer: 3,
+            hint: "葉子片數會隨落葉生長隨時改變，不是穩定客觀的特徵！"
+          },
+          {
+            type: "tf",
+            level: "詮釋整合",
+            q: "為植物進行二分法分類時，兩類中的植物數量不一定要剛好相同，重點在特徵明確客觀。",
+            answer: true,
+            hint: "分類依據的是客觀特徵標準，不是數量的平均分配。"
+          },
+          {
+            type: "match",
+            level: "統整解釋",
+            q: "請依據植物的生存特性與型態特徵正確分類：",
+            pairs: [
+              { item: "大萍", target: "生長在水中的浮水植物" },
+              { item: "樟樹", target: "直立粗壯的陸生木本植物" },
+              { item: "甘藷", target: "莖匍匐於地且塊根儲存養分" }
+            ],
+            hint: "水生/陸生、木本/草本是很好的二分法分類維度。"
+          }
+        ]
+      },
+      {
+        id: 10,
+        act: 4,
+        actName: "終章：小小植物學家授章盛典",
+        name: "榮譽殿堂與證書頒發",
+        icon: "🏆",
+        badge: "單元總結 實力認證",
+        pos: new THREE.Vector3(0, 0, 0),
+        quest: "回到中央金色榮譽台，領取五上自然特優榮譽證書！",
+        text: `🎉 <strong>恭喜你！</strong> 你已經走遍了植物身體的各個部位、解開了花果授粉的奇蹟、見識了種子飛翔與彈射的大冒險，並掌握了科學分類的二分法！<br><br>
+               你已經具備國小自然科最紮實的植物科學素養，快在證書上寫下你的名字與學校班級，領取金牌榮譽證書吧！`,
+        steps: [
+          {
+            type: "tf",
+            level: "評鑑",
+            q: "植物透過根、莖、葉、花、果實、種子彼此協同運作，並適應環境繁衍後代，展現豐富的生命力。",
+            answer: true,
+            hint: "植物是地球生態系最偉大而關鍵的綠色生產者！"
+          }
+        ]
+      }
+    ];
+
+    /* --- 3. Game State --- */
+    const G = {
+      curStage: 0,
+      curStep: 0,
+      hp: 100,
+      seeds: 0,
+      cleared: new Set(),
+      unlocked: 0,
+      isNearTarget: false,
+      inDialog: false,
+      userSchool: "新進國小五年級",
+      userName: "小小植物探索家"
+    };
+
+    // Load LocalStorage
+    try {
+      const saved = localStorage.getItem('plant-science-5u-v1');
+      if (saved) {
+        const d = JSON.parse(saved);
+        G.cleared = new Set(d.cleared || []);
+        G.unlocked = d.unlocked || 0;
+        G.seeds = d.seeds || 0;
+      }
+    } catch(e) {}
+
+    function saveGame() {
+      try {
+        localStorage.setItem('plant-science-5u-v1', JSON.stringify({
+          cleared: Array.from(G.cleared),
+          unlocked: G.unlocked,
+          seeds: G.seeds
+        }));
+      } catch(e) {}
+    }
+
+    /* --- 4. Three.js Scene Setup --- */
+    const canvas = document.getElementById('webgl-canvas');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.8));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.05;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x7ec0ee);
+    scene.fog = new THREE.FogExp2(0xa5d6a7, 0.012);
+
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 800);
+    camera.position.set(0, 8, 14);
+
+    // Lights
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x446633, 0.7);
+    scene.add(hemiLight);
+
+    const dirLight = new THREE.DirectionalLight(0xfff4d6, 1.4);
+    dirLight.position.set(40, 60, 30);
+    dirLight.castShadow = true;
+    dirLight.shadow.mapSize.width = 2048;
+    dirLight.shadow.mapSize.height = 2048;
+    dirLight.shadow.camera.near = 0.5;
+    dirLight.shadow.camera.far = 250;
+    dirLight.shadow.camera.left = -70;
+    dirLight.shadow.camera.right = 70;
+    dirLight.shadow.camera.top = 70;
+    dirLight.shadow.camera.bottom = -70;
+    scene.add(dirLight);
+
+    /* --- 5. Procedural 3D Environment --- */
+    // Terrain Ground
+    const groundGeo = new THREE.PlaneGeometry(300, 300, 64, 64);
+    groundGeo.rotateX(-Math.PI / 2);
+    // Add subtle elevation hills
+    const posAttr = groundGeo.attributes.position;
+    for (let i = 0; i < posAttr.count; i++) {
+      const x = posAttr.getX(i);
+      const z = posAttr.getZ(i);
+      const dist = Math.sqrt(x*x + z*z);
+      if (dist > 40) {
+        const h = Math.sin(x * 0.08) * Math.cos(z * 0.08) * 2.5;
+        posAttr.setY(i, h);
+      }
+    }
+    groundGeo.computeVertexNormals();
+    const groundMat = new THREE.MeshStandardMaterial({
+      color: 0x3d7e35,
+      roughness: 0.85,
+      metalness: 0.1
+    });
+    const ground = new THREE.Mesh(groundGeo, groundMat);
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    // Eco Pond
+    const pondGeo = new THREE.CylinderGeometry(18, 18, 0.4, 32);
+    const pondMat = new THREE.MeshStandardMaterial({
+      color: 0x29b6f6,
+      roughness: 0.15,
+      metalness: 0.8,
+      transparent: true,
+      opacity: 0.85
+    });
+    const pond = new THREE.Mesh(pondGeo, pondMat);
+    pond.position.set(30, 0.1, -35);
+    scene.add(pond);
+
+    // Giant Trees & Plants Procedural Factory
+    function createTree(x, z, scale = 1, type = 'broad') {
+      const treeGroup = new THREE.Group();
+      // Trunk
+      const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5c4033, roughness: 0.9 });
+      const trunkGeo = new THREE.CylinderGeometry(0.3 * scale, 0.5 * scale, 4 * scale, 8);
+      const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+      trunk.position.y = 2 * scale;
+      trunk.castShadow = true;
+      treeGroup.add(trunk);
+
+      // Foliage
+      const foliageMat = new THREE.MeshStandardMaterial({
+        color: type === 'broad' ? 0x2e7d32 : 0x1b5e20,
+        roughness: 0.7
+      });
+      for (let i = 0; i < 3; i++) {
+        const r = (2.2 - i * 0.5) * scale;
+        const folGeo = new THREE.ConeGeometry(r, 2.5 * scale, 8);
+        const fol = new THREE.Mesh(folGeo, foliageMat);
+        fol.position.y = (3.5 + i * 1.4) * scale;
+        fol.castShadow = true;
+        treeGroup.add(fol);
+      }
+      treeGroup.position.set(x, 0, z);
+      scene.add(treeGroup);
+      return treeGroup;
+    }
+
+    // Populate natural scenery trees
+    for (let i = 0; i < 45; i++) {
+      const angle = (i / 45) * Math.PI * 2;
+      const dist = 50 + Math.random() * 55;
+      const x = Math.cos(angle) * dist;
+      const z = Math.sin(angle) * dist;
+      createTree(x, z, 1.2 + Math.random() * 0.8, i % 2 === 0 ? 'broad' : 'pine');
+    }
+
+    // Sunflower / Giant Flower Landmark for Act 2
+    function createGiantFlower(x, z) {
+      const fg = new THREE.Group();
+      // Stem
+      const stemGeo = new THREE.CylinderGeometry(0.2, 0.25, 6, 8);
+      const stemMat = new THREE.MeshStandardMaterial({ color: 0x4caf50 });
+      const stem = new THREE.Mesh(stemGeo, stemMat);
+      stem.position.y = 3;
+      stem.castShadow = true;
+      fg.add(stem);
+      // Flower Disc
+      const discGeo = new THREE.CylinderGeometry(1.2, 1.2, 0.3, 16);
+      const discMat = new THREE.MeshStandardMaterial({ color: 0x5d4037, roughness: 0.9 });
+      const disc = new THREE.Mesh(discGeo, discMat);
+      disc.position.set(0, 6, 0);
+      disc.rotation.x = Math.PI / 4;
+      fg.add(disc);
+      // Petals
+      const petalMat = new THREE.MeshStandardMaterial({ color: 0xffeb3b, roughness: 0.5 });
+      for (let i = 0; i < 12; i++) {
+        const petGeo = new THREE.ConeGeometry(0.5, 1.8, 4);
+        const pet = new THREE.Mesh(petGeo, petalMat);
+        const ang = (i / 12) * Math.PI * 2;
+        pet.position.set(Math.cos(ang) * 1.5, 6 + Math.sin(ang) * 1.2, 0.2);
+        pet.rotation.z = ang - Math.PI / 2;
+        pet.rotation.x = Math.PI / 4;
+        fg.add(pet);
+      }
+      fg.position.set(x, 0, z);
+      scene.add(fg);
+    }
+    createGiantFlower(-30, 35);
+
+    // Desert Cactus Landmark for Act 4
+    function createCactus(x, z) {
+      const cg = new THREE.Group();
+      const cacMat = new THREE.MeshStandardMaterial({ color: 0x2e7d32, roughness: 0.8 });
+      const mainGeo = new THREE.CylinderGeometry(0.6, 0.6, 5, 12);
+      const main = new THREE.Mesh(mainGeo, cacMat);
+      main.position.y = 2.5;
+      main.castShadow = true;
+      cg.add(main);
+      // Arm 1
+      const armGeo = new THREE.CylinderGeometry(0.3, 0.3, 2, 8);
+      const arm1 = new THREE.Mesh(armGeo, cacMat);
+      arm1.position.set(1.1, 3.2, 0);
+      cg.add(arm1);
+      cg.position.set(x, 0, z);
+      scene.add(cg);
+    }
+    createCactus(0, -50);
+
+    // Floating Pollen / Dandelion Particle System
+    const particleCount = 220;
+    const partGeo = new THREE.BufferGeometry();
+    const partPos = new Float32Array(particleCount * 3);
+    for (let i = 0; i < particleCount; i++) {
+      partPos[i * 3] = (Math.random() - 0.5) * 120;
+      partPos[i * 3 + 1] = 1 + Math.random() * 12;
+      partPos[i * 3 + 2] = (Math.random() - 0.5) * 120;
+    }
+    partGeo.setAttribute('position', new THREE.BufferAttribute(partPos, 3));
+    const partMat = new THREE.PointsMaterial({
+      color: 0xfff9c4,
+      size: 0.35,
+      transparent: true,
+      opacity: 0.75
+    });
+    const particles = new THREE.Points(partGeo, partMat);
+    scene.add(particles);
+
+    /* --- 6. Player Character & Target Ring --- */
+    const playerGroup = new THREE.Group();
+    // Body (Capsule-like)
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x388e3c, roughness: 0.5 });
+    const bodyGeo = new THREE.CylinderGeometry(0.4, 0.4, 1.2, 12);
+    const body = new THREE.Mesh(bodyGeo, bodyMat);
+    body.position.y = 1.0;
+    body.castShadow = true;
+    playerGroup.add(body);
+    // Head
+    const headMat = new THREE.MeshStandardMaterial({ color: 0xffcc80, roughness: 0.6 });
+    const headGeo = new THREE.SphereGeometry(0.38, 16, 16);
+    const head = new THREE.Mesh(headGeo, headMat);
+    head.position.y = 1.85;
+    head.castShadow = true;
+    playerGroup.add(head);
+    // Explorer Straw Hat
+    const hatMat = new THREE.MeshStandardMaterial({ color: 0xffb74d, roughness: 0.8 });
+    const hatBrim = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 0.08, 16), hatMat);
+    hatBrim.position.y = 2.15;
+    playerGroup.add(hatBrim);
+    const hatTop = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.45, 0.4, 16), hatMat);
+    hatTop.position.y = 2.35;
+    playerGroup.add(hatTop);
+
+    playerGroup.position.set(0, 0, 8);
+    scene.add(playerGroup);
+
+    // Glowing Target Ring & Seed Marker
+    const targetRingGeo = new THREE.RingGeometry(1.6, 2.2, 32);
+    targetRingGeo.rotateX(-Math.PI / 2);
+    const targetRingMat = new THREE.MeshBasicMaterial({
+      color: 0xffca28,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.8
+    });
+    const targetRing = new THREE.Mesh(targetRingGeo, targetRingMat);
+    targetRing.position.y = 0.05;
+    scene.add(targetRing);
+
+    // Floating Golden Seed Crystal Icon
+    const seedGeo = new THREE.OctahedronGeometry(0.9, 0);
+    const seedMat = new THREE.MeshStandardMaterial({
+      color: 0xffb300,
+      emissive: 0xff8f00,
+      emissiveIntensity: 0.6,
+      roughness: 0.2,
+      metalness: 0.8
+    });
+    const seedMarker = new THREE.Mesh(seedGeo, seedMat);
+    seedMarker.castShadow = true;
+    scene.add(seedMarker);
+
+    function updateStageTarget() {
+      const stage = STAGES[G.curStage];
+      targetRing.position.set(stage.pos.x, 0.05, stage.pos.z);
+      seedMarker.position.set(stage.pos.x, 2.6, stage.pos.z);
+      document.getElementById('hud-act').textContent = stage.actName;
+      document.getElementById('hud-quest').textContent = `關卡 ${stage.id + 1}：${stage.name}`;
+      document.getElementById('hud-seeds').textContent = G.seeds;
+    }
+
+    /* --- 7. Controls & Movement --- */
+    const keys = { w: false, a: false, s: false, d: false, ArrowUp: false, ArrowLeft: false, ArrowDown: false, ArrowRight: false };
+    window.addEventListener('keydown', (e) => {
+      if (keys.hasOwnProperty(e.key)) keys[e.key] = true;
+      if (e.key === ' ' && G.isNearTarget && !G.inDialog) {
+        openDialog();
+      }
+    });
+    window.addEventListener('keyup', (e) => {
+      if (keys.hasOwnProperty(e.key)) keys[e.key] = false;
+    });
+
+    // Mouse / Touch Camera Rotation
+    let isDragging = false;
+    let prevMouseX = 0;
+    let prevMouseY = 0;
+    let camYaw = 0;
+    let camPitch = 0.32;
+    const camDist = 12;
+
+    window.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('#hud') || e.target.closest('.modal-overlay') || e.target.closest('#joystick-zone') || e.target.closest('#interact-prompt')) return;
+      isDragging = true;
+      prevMouseX = e.clientX;
+      prevMouseY = e.clientY;
+    });
+    window.addEventListener('pointermove', (e) => {
+      if (!isDragging) return;
+      const dx = e.clientX - prevMouseX;
+      const dy = e.clientY - prevMouseY;
+      prevMouseX = e.clientX;
+      prevMouseY = e.clientY;
+      camYaw -= dx * 0.006;
+      camPitch = Math.max(0.1, Math.min(1.2, camPitch + dy * 0.005));
+    });
+    window.addEventListener('pointerup', () => { isDragging = false; });
+
+    // Touch Virtual Joystick
+    let joyTouchId = null;
+    let joyDir = { x: 0, y: 0 };
+    const joyZone = document.getElementById('joystick-zone');
+    const joyThumb = document.getElementById('joystick-thumb');
+
+    if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+      joyZone.style.display = 'block';
+      joyZone.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        const t = e.changedTouches[0];
+        joyTouchId = t.identifier;
+        updateJoystick(t.clientX, t.clientY);
+      }, { passive: false });
+
+      window.addEventListener('touchmove', (e) => {
+        for (let i = 0; i < e.changedTouches.length; i++) {
+          const t = e.changedTouches[i];
+          if (t.identifier === joyTouchId) {
+            updateJoystick(t.clientX, t.clientY);
+            break;
+          }
+        }
+      }, { passive: false });
+
+      window.addEventListener('touchend', (e) => {
+        for (let i = 0; i < e.changedTouches.length; i++) {
+          if (e.changedTouches[i].identifier === joyTouchId) {
+            joyTouchId = null;
+            joyDir = { x: 0, y: 0 };
+            joyThumb.style.transform = `translate(0px, 0px)`;
+            break;
+          }
+        }
+      });
+    }
+
+    function updateJoystick(clientX, clientY) {
+      const rect = joyZone.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      let dx = clientX - cx;
+      let dy = clientY - cy;
+      const maxR = rect.width / 2 - 10;
+      const dist = Math.hypot(dx, dy);
+      if (dist > maxR) {
+        dx = (dx / dist) * maxR;
+        dy = (dy / dist) * maxR;
+      }
+      joyThumb.style.transform = `translate(${dx}px, ${dy}px)`;
+      joyDir.x = dx / maxR;
+      joyDir.y = dy / maxR;
+    }
+
+    /* --- 8. Dialog & Pedagogical Flow --- */
+    const promptBtn = document.getElementById('interact-prompt');
+    promptBtn.addEventListener('click', openDialog);
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      toast.textContent = msg;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 2400);
+    }
+
+    function openDialog() {
+      G.inDialog = true;
+      SND.playChime();
+      const stage = STAGES[G.curStage];
+      document.getElementById('dlg-icon').textContent = stage.icon;
+      document.getElementById('dlg-title').textContent = stage.name;
+      document.getElementById('dlg-badge').textContent = stage.badge;
+      document.getElementById('dlg-text').innerHTML = stage.text;
+
+      document.getElementById('view-lesson').style.display = 'block';
+      document.getElementById('view-question').style.display = 'none';
+      document.getElementById('dialog-modal').classList.add('active');
+    }
+
+    function closeDialog() {
+      G.inDialog = false;
+      document.getElementById('dialog-modal').classList.remove('active');
+    }
+
+    document.getElementById('btn-start-challenge').addEventListener('click', () => {
+      document.getElementById('view-lesson').style.display = 'none';
+      document.getElementById('view-question').style.display = 'block';
+      G.curStep = 0;
+      renderCurrentStep();
+    });
+
+    let selectedAnswers = new Set();
+    let pairedMatches = {};
+    let activeMatchItem = null;
+    let orderItemsState = [];
+
+    function renderCurrentStep() {
+      const stage = STAGES[G.curStage];
+      const step = stage.steps[G.curStep];
+      document.getElementById('q-level').textContent = `PIRLS ${step.level}`;
+      document.getElementById('q-step-index').textContent = `第 ${G.curStep + 1} / ${stage.steps.length} 題`;
+      document.getElementById('q-stem').textContent = step.q;
+
+      const body = document.getElementById('q-body');
+      body.innerHTML = '';
+      const feedback = document.getElementById('q-feedback');
+      feedback.className = 'feedback-box';
+      feedback.textContent = '';
+      document.getElementById('btn-submit-step').style.display = 'inline-block';
+      document.getElementById('btn-retry-step').style.display = 'none';
+      document.getElementById('btn-next-step').style.display = 'none';
+
+      selectedAnswers.clear();
+      pairedMatches = {};
+      activeMatchItem = null;
+
+      if (step.type === 'tf') {
+        const grid = document.createElement('div');
+        grid.className = 'options-grid';
+        [
+          { label: '⭕ 是（正確符合課文）', val: true },
+          { label: '❌ 否（錯誤不符課文）', val: false }
+        ].forEach(opt => {
+          const btn = document.createElement('button');
+          btn.className = 'option-btn';
+          btn.textContent = opt.label;
+          btn.onclick = () => {
+            grid.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+            selectedAnswers.clear();
+            selectedAnswers.add(opt.val);
+          };
+          grid.appendChild(btn);
+        });
+        body.appendChild(grid);
+      }
+      else if (step.type === 'choice') {
+        const grid = document.createElement('div');
+        grid.className = 'options-grid';
+        const letters = ['A', 'B', 'C', 'D'];
+        step.options.forEach((optText, idx) => {
+          const btn = document.createElement('button');
+          btn.className = 'option-btn';
+          btn.innerHTML = `<strong>${letters[idx]}.</strong> <span>${optText}</span>`;
+          btn.onclick = () => {
+            grid.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+            selectedAnswers.clear();
+            selectedAnswers.add(idx);
+          };
+          grid.appendChild(btn);
+        });
+        body.appendChild(grid);
+      }
+      else if (step.type === 'multi') {
+        const grid = document.createElement('div');
+        grid.className = 'options-grid';
+        step.options.forEach((optText, idx) => {
+          const btn = document.createElement('button');
+          btn.className = 'option-btn';
+          btn.innerHTML = `<span class="check-box">⬜</span> <span>${optText}</span>`;
+          btn.onclick = () => {
+            if (selectedAnswers.has(idx)) {
+              selectedAnswers.delete(idx);
+              btn.classList.remove('selected');
+              btn.querySelector('.check-box').textContent = '⬜';
+            } else {
+              selectedAnswers.add(idx);
+              btn.classList.add('selected');
+              btn.querySelector('.check-box').textContent = '✅';
+            }
+          };
+          grid.appendChild(btn);
+        });
+        body.appendChild(grid);
+      }
+      else if (step.type === 'match') {
+        const container = document.createElement('div');
+        container.className = 'match-container';
+        const leftCol = document.createElement('div');
+        leftCol.className = 'match-col';
+        const rightCol = document.createElement('div');
+        rightCol.className = 'match-col';
+
+        step.pairs.forEach(p => {
+          const lItem = document.createElement('div');
+          lItem.className = 'match-item';
+          lItem.textContent = p.item;
+          lItem.dataset.key = p.item;
+          lItem.onclick = () => {
+            if (pairedMatches[p.item]) return;
+            leftCol.querySelectorAll('.match-item').forEach(i => i.classList.remove('active'));
+            lItem.classList.add('active');
+            activeMatchItem = p.item;
+          };
+          leftCol.appendChild(lItem);
+        });
+
+        // Shuffle targets
+        const shuffledTargets = [...step.pairs.map(p => p.target)].sort(() => Math.random() - 0.5);
+        shuffledTargets.forEach(tgt => {
+          const rItem = document.createElement('div');
+          rItem.className = 'match-item';
+          rItem.textContent = tgt;
+          rItem.dataset.val = tgt;
+          rItem.onclick = () => {
+            if (!activeMatchItem) return;
+            pairedMatches[activeMatchItem] = tgt;
+            // update styles
+            const lEl = leftCol.querySelector(`[data-key="${activeMatchItem}"]`);
+            lEl.classList.remove('active');
+            lEl.classList.add('paired');
+            lEl.textContent = `${activeMatchItem} ➔ ${tgt}`;
+            rItem.classList.add('paired');
+            rItem.style.pointerEvents = 'none';
+            activeMatchItem = null;
+          };
+          rightCol.appendChild(rItem);
+        });
+
+        container.appendChild(leftCol);
+        container.appendChild(rightCol);
+        body.appendChild(container);
+      }
+      else if (step.type === 'order') {
+        const orderList = document.createElement('div');
+        orderList.className = 'order-list';
+        orderItemsState = [...step.items].sort(() => Math.random() - 0.5);
+
+        function renderOrderItems() {
+          orderList.innerHTML = '';
+          orderItemsState.forEach((itemText, idx) => {
+            const row = document.createElement('div');
+            row.className = 'order-item';
+            row.innerHTML = `<span>${idx + 1}. ${itemText}</span>`;
+            const btnGroup = document.createElement('div');
+            btnGroup.className = 'order-btns';
+            if (idx > 0) {
+              const up = document.createElement('button');
+              up.className = 'order-btn-move';
+              up.textContent = '▲';
+              up.onclick = () => {
+                [orderItemsState[idx], orderItemsState[idx - 1]] = [orderItemsState[idx - 1], orderItemsState[idx]];
+                renderOrderItems();
+              };
+              btnGroup.appendChild(up);
+            }
+            if (idx < orderItemsState.length - 1) {
+              const down = document.createElement('button');
+              down.className = 'order-btn-move';
+              down.textContent = '▼';
+              down.onclick = () => {
+                [orderItemsState[idx], orderItemsState[idx + 1]] = [orderItemsState[idx + 1], orderItemsState[idx]];
+                renderOrderItems();
+              };
+              btnGroup.appendChild(down);
+            }
+            row.appendChild(btnGroup);
+            orderList.appendChild(row);
+          });
+        }
+        renderOrderItems();
+        body.appendChild(orderList);
+      }
+    }
+
+    document.getElementById('btn-submit-step').addEventListener('click', () => {
+      const stage = STAGES[G.curStage];
+      const step = stage.steps[G.curStep];
+      const feedback = document.getElementById('q-feedback');
+      let isCorrect = false;
+
+      if (step.type === 'tf') {
+        const ans = Array.from(selectedAnswers)[0];
+        isCorrect = (ans === step.answer);
+      } else if (step.type === 'choice') {
+        const ans = Array.from(selectedAnswers)[0];
+        isCorrect = (ans === step.answer);
+      } else if (step.type === 'multi') {
+        const ansArr = Array.from(selectedAnswers).sort();
+        const expected = [...step.answer].sort();
+        isCorrect = (JSON.stringify(ansArr) === JSON.stringify(expected));
+      } else if (step.type === 'match') {
+        isCorrect = step.pairs.every(p => pairedMatches[p.item] === p.target);
+      } else if (step.type === 'order') {
+        isCorrect = (JSON.stringify(orderItemsState) === JSON.stringify(step.items));
+      }
+
+      if (isCorrect) {
+        SND.playCorrect();
+        feedback.className = 'feedback-box success show';
+        feedback.innerHTML = `🎉 <strong>回答正確！</strong> 掌握了核心科學概念！`;
+        document.getElementById('btn-submit-step').style.display = 'none';
+        document.getElementById('btn-next-step').style.display = 'inline-block';
+      } else {
+        SND.playWrong();
+        G.hp = Math.max(0, G.hp - 15);
+        updateHP();
+        feedback.className = 'feedback-box error show';
+        feedback.innerHTML = `⚠️ <strong>觀念需要再釐清：</strong> ${step.hint}`;
+        document.getElementById('btn-submit-step').style.display = 'none';
+        document.getElementById('btn-retry-step').style.display = 'inline-block';
+
+        if (G.hp <= 0) {
+          showToast("體力耗盡！稍作休息恢復 60 體力，重新複習課文後再戰！");
+          G.hp = 60;
+          updateHP();
+          setTimeout(() => {
+            document.getElementById('view-question').style.display = 'none';
+            document.getElementById('view-lesson').style.display = 'block';
+          }, 1400);
+        }
+      }
+    });
+
+    document.getElementById('btn-retry-step').addEventListener('click', () => {
+      renderCurrentStep();
+    });
+
+    document.getElementById('btn-next-step').addEventListener('click', () => {
+      const stage = STAGES[G.curStage];
+      G.curStep++;
+      if (G.curStep < stage.steps.length) {
+        renderCurrentStep();
+      } else {
+        // Complete current stage
+        completeStage();
+      }
+    });
+
+    function updateHP() {
+      const bar = document.getElementById('hud-hp-bar');
+      bar.style.width = `${G.hp}%`;
+      bar.style.backgroundColor = G.hp > 50 ? '#22c55e' : (G.hp > 25 ? '#eab308' : '#ef4444');
+      document.getElementById('hud-hp-text').textContent = G.hp;
+    }
+
+    function completeStage() {
+      SND.playBadge();
+      G.cleared.add(G.curStage);
+      G.seeds += 3;
+      G.unlocked = Math.max(G.unlocked, G.curStage + 1);
+      saveGame();
+      closeDialog();
+
+      showToast(`🏆 恭喜通過【${STAGES[G.curStage].name}】！獲得 3 枚金色種子徽章！`);
+
+      if (G.curStage >= STAGES.length - 1) {
+        setTimeout(openCertModal, 1500);
+      } else {
+        G.curStage++;
+        updateStageTarget();
+      }
+    }
+
+    /* --- 9. Stage List Navigation --- */
+    const stagesModal = document.getElementById('stages-modal');
+    document.getElementById('btn-stages').addEventListener('click', () => {
+      renderStagesList();
+      stagesModal.classList.add('active');
+    });
+    document.getElementById('btn-close-stages').addEventListener('click', () => {
+      stagesModal.classList.remove('active');
+    });
+
+    function renderStagesList() {
+      const container = document.getElementById('stages-list-container');
+      container.innerHTML = '';
+      STAGES.forEach((st, idx) => {
+        const item = document.createElement('div');
+        const isUnlocked = (idx <= G.unlocked);
+        const isCleared = G.cleared.has(idx);
+        item.style.padding = '12px 16px';
+        item.style.borderRadius = '12px';
+        item.style.display = 'flex';
+        item.style.justifyContent = 'space-between';
+        item.style.alignItems = 'center';
+        item.style.background = idx === G.curStage ? '#e8f5e9' : '#f8fafc';
+        item.style.border = idx === G.curStage ? '2px solid #2e7d32' : '1px solid #cbd5e1';
+        item.style.cursor = isUnlocked ? 'pointer' : 'not-allowed';
+        item.style.opacity = isUnlocked ? '1' : '0.5';
+
+        item.innerHTML = `
+          <div>
+            <span style="font-size:1.2rem; margin-right:8px;">${st.icon}</span>
+            <strong style="color:#1e293b;">關卡 ${idx + 1}：${st.name}</strong>
+            <div style="font-size:0.85rem; color:#64748b; margin-top:2px;">${st.badge}</div>
+          </div>
+          <div>
+            ${isCleared ? '✅ 已通關' : (isUnlocked ? '🔓 可挑戰' : '🔒 未解鎖')}
+          </div>
+        `;
+        if (isUnlocked) {
+          item.onclick = () => {
+            G.curStage = idx;
+            playerGroup.position.set(st.pos.x, 0, st.pos.z + 4);
+            updateStageTarget();
+            stagesModal.classList.remove('active');
+          };
+        }
+        container.appendChild(item);
+      });
+    }
+
+    // Teacher Override Channel
+    document.getElementById('btn-teacher').addEventListener('click', () => {
+      const code = prompt("請輸入教師全關卡快速通行解鎖碼（例如 teacher115 或 ijun）：");
+      if (code === 'teacher115' || code === 'ijun' || code === '115') {
+        G.unlocked = STAGES.length - 1;
+        for (let i = 0; i < STAGES.length; i++) G.cleared.add(i);
+        G.seeds = 33;
+        saveGame();
+        showToast("🎓 教師模式：全數 11 關已全部解鎖！");
+        updateStageTarget();
+      } else if (code !== null) {
+        alert("密碼不正確，提示：teacher115 或 ijun");
+      }
+    });
+
+    // Sound Toggle
+    document.getElementById('btn-sound').addEventListener('click', (e) => {
+      SND.enabled = !SND.enabled;
+      e.target.textContent = SND.enabled ? '🔊' : '🔇';
+      showToast(SND.enabled ? "已開啟音效" : "已靜音");
+    });
+
+    /* --- 10. Certificate Generation (Canvas) --- */
+    const certModal = document.getElementById('cert-modal');
+    function openCertModal() {
+      certModal.classList.add('active');
+      drawCertificate();
+    }
+
+    document.getElementById('btn-gen-cert').addEventListener('click', () => {
+      const sch = document.getElementById('cert-school').value.trim();
+      const nm = document.getElementById('cert-name').value.trim();
+      if (sch) G.userSchool = sch;
+      if (nm) G.userName = nm;
+      drawCertificate();
+    });
+
+    document.getElementById('btn-download-cert').addEventListener('click', () => {
+      const c = document.getElementById('cert-canvas');
+      const a = document.createElement('a');
+      a.download = `千變萬化的植物_自然科學榮譽證書_${G.userName}.png`;
+      a.href = c.toDataURL('image/png');
+      a.click();
+    });
+
+    document.getElementById('btn-restart-game').addEventListener('click', () => {
+      certModal.classList.remove('active');
+      G.curStage = 0;
+      updateStageTarget();
+      playerGroup.position.set(0, 0, 8);
+    });
+
+    function drawCertificate() {
+      const c = document.getElementById('cert-canvas');
+      const ctx = c.getContext('2d');
+      const W = c.width;
+      const H = c.height;
+
+      // Background Gradient
+      const grad = ctx.createLinearGradient(0, 0, W, H);
+      grad.addColorStop(0, '#fbfdf9');
+      grad.addColorStop(1, '#e8f5e9');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W, H);
+
+      // Gold Borders
+      ctx.strokeStyle = '#c5a059';
+      ctx.lineWidth = 14;
+      ctx.strokeRect(25, 25, W - 50, H - 50);
+
+      ctx.strokeStyle = '#2e7d32';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(38, 38, W - 76, H - 76);
+
+      // Header Banner
+      ctx.fillStyle = '#1b5e20';
+      ctx.font = 'bold 50px "Microsoft JhengHei", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('國小自然科學領域 素養榮譽證書', W / 2, 130);
+
+      ctx.fillStyle = '#ff8f00';
+      ctx.font = 'bold 30px "Microsoft JhengHei", sans-serif';
+      ctx.fillText('★ 五年級上學期第二單元：千變萬化的植物 ★', W / 2, 185);
+
+      // Student Info
+      ctx.fillStyle = '#0f172a';
+      ctx.font = 'bold 36px "Microsoft JhengHei", sans-serif';
+      ctx.fillText(`${G.userSchool}  ${G.userName} 同學`, W / 2, 280);
+
+      // Body text
+      ctx.fillStyle = '#334155';
+      ctx.font = '26px "Microsoft JhengHei", sans-serif';
+      ctx.fillText('於本單元 3D 沉浸式探究遊戲中，深入探索植物根莖葉輸送、', W / 2, 360);
+      ctx.fillText('微觀花朵授粉受精、種子四大傳播大冒險與科學二分法檢索。', W / 2, 410);
+      ctx.fillText('表現卓著，思維縝密，特頒此狀以資表揚！', W / 2, 460);
+
+      // Score / Medal Box
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(W / 2 - 250, 520, 500, 100);
+      ctx.strokeStyle = '#81c784';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(W / 2 - 250, 520, 500, 100);
+
+      ctx.fillStyle = '#2e7d32';
+      ctx.font = 'bold 32px "Microsoft JhengHei", sans-serif';
+      ctx.fillText(`榮譽評定：特優小植物學家 🏆`, W / 2, 570);
+      ctx.font = '20px "Microsoft JhengHei", sans-serif';
+      ctx.fillStyle = '#64748b';
+      ctx.fillText(`累積榮譽徽章：${G.seeds} 枚金色種子 (滿分榮耀)`, W / 2, 605);
+
+      // Red Official Seal Stamp (Canvas procedural drawing)
+      const sealX = W - 220;
+      const sealY = H - 180;
+      ctx.save();
+      ctx.strokeStyle = '#c62828';
+      ctx.lineWidth = 6;
+      ctx.strokeRect(sealX - 65, sealY - 65, 130, 130);
+      ctx.fillStyle = '#c62828';
+      ctx.font = 'bold 24px "Microsoft JhengHei", serif';
+      ctx.fillText('自然科學', sealX, sealY - 15);
+      ctx.fillText('特優之印', sealX, sealY + 25);
+      ctx.restore();
+
+      // Date
+      const today = new Date();
+      const dateStr = `中華民國 ${today.getFullYear() - 1911} 年 ${today.getMonth() + 1} 月 ${today.getDate()} 日`;
+      ctx.fillStyle = '#475569';
+      ctx.font = 'bold 24px "Microsoft JhengHei", sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(dateStr, 80, H - 90);
+
+      // Update preview image
+      document.getElementById('cert-preview').src = c.toDataURL('image/png');
+    }
+
+    /* --- 11. Main Animation Loop --- */
+    const clock = new THREE.Clock();
+    let moveSpeed = 16;
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const delta = clock.getDelta();
+      const elapsed = clock.getElapsedTime();
+
+      // Move particles
+      const pAttr = partGeo.attributes.position;
+      for (let i = 0; i < particleCount; i++) {
+        let y = pAttr.getY(i) - delta * 0.4;
+        let x = pAttr.getX(i) + Math.sin(elapsed + i) * delta * 0.3;
+        if (y < 0.2) y = 10;
+        pAttr.setY(i, y);
+        pAttr.setX(i, x);
+      }
+      pAttr.needsUpdate = true;
+
+      // Rotate target ring & pulse seed marker
+      targetRing.rotation.z += delta * 1.2;
+      seedMarker.rotation.y += delta * 1.5;
+      seedMarker.position.y = 2.6 + Math.sin(elapsed * 3) * 0.35;
+
+      // Handle Character Movement
+      if (!G.inDialog) {
+        let moveX = 0;
+        let moveZ = 0;
+
+        if (keys.w || keys.ArrowUp) moveZ -= 1;
+        if (keys.s || keys.ArrowDown) moveZ += 1;
+        if (keys.a || keys.ArrowLeft) moveX -= 1;
+        if (keys.d || keys.ArrowRight) moveX += 1;
+
+        if (joyDir.x !== 0 || joyDir.y !== 0) {
+          moveX = joyDir.x;
+          moveZ = joyDir.y;
+        }
+
+        const len = Math.hypot(moveX, moveZ);
+        if (len > 0.05) {
+          // Normalize
+          const nx = moveX / len;
+          const nz = moveZ / len;
+
+          // Camera-relative direction
+          const forward = new THREE.Vector3(Math.sin(camYaw), 0, Math.cos(camYaw));
+          const right = new THREE.Vector3(-Math.cos(camYaw), 0, Math.sin(camYaw));
+
+          const dir = new THREE.Vector3()
+            .addScaledVector(forward, -nz)
+            .addScaledVector(right, nx)
+            .normalize();
+
+          playerGroup.position.addScaledVector(dir, moveSpeed * delta);
+          playerGroup.rotation.y = Math.atan2(dir.x, dir.z);
+
+          // Subtle walking bounce
+          playerGroup.position.y = Math.abs(Math.sin(elapsed * 12)) * 0.18;
+        } else {
+          playerGroup.position.y = 0;
+        }
+      }
+
+      // Smooth Camera Follow
+      const targetCamPos = new THREE.Vector3(
+        playerGroup.position.x + Math.sin(camYaw) * (camDist * Math.cos(camPitch)),
+        playerGroup.position.y + camDist * Math.sin(camPitch),
+        playerGroup.position.z + Math.cos(camYaw) * (camDist * Math.cos(camPitch))
+      );
+      camera.position.lerp(targetCamPos, 0.12);
+      camera.lookAt(playerGroup.position.x, playerGroup.position.y + 1.4, playerGroup.position.z);
+
+      // Distance Check to current stage target
+      const stage = STAGES[G.curStage];
+      const distToTarget = playerGroup.position.distanceTo(stage.pos);
+      if (distToTarget < 4.5) {
+        G.isNearTarget = true;
+        promptBtn.classList.add('show');
+      } else {
+        G.isNearTarget = false;
+        promptBtn.classList.remove('show');
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    // Window Resize
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // Start Button Click & Loading Done
+    const startBtn = document.getElementById('start-btn');
+    const loadBar = document.getElementById('load-bar');
+    const loadStatus = document.getElementById('load-status');
+
+    let loadProgress = 0;
+    const loadTimer = setInterval(() => {
+      loadProgress += 15;
+      loadBar.style.width = `${Math.min(100, loadProgress)}%`;
+      if (loadProgress >= 100) {
+        clearInterval(loadTimer);
+        loadStatus.textContent = "✅ 自然生態圈建置完成！準備好出發探險！";
+        startBtn.style.display = 'block';
+      }
+    }, 80);
+
+    startBtn.addEventListener('click', () => {
+      SND.init();
+      document.getElementById('loading-screen').classList.add('done');
+      updateStageTarget();
+      updateHP();
+    });
+
+    // Expose debug hooks for testing
+    window.__game = { G, STAGES, SND, openDialog, completeStage };
+    window.__bird = { G, ST: STAGES, SND, interact: openDialog };
+
+    // Kickoff
+    animate();
+  </script>
+</body>
+</html>
